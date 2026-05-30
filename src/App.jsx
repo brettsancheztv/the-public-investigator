@@ -326,7 +326,7 @@ function HomePage({ setPage }) {
               Got a weird problem? A strange story? A situation that makes no sense? <strong className="font-black not-italic text-[#F2C94C]">Tell us. We'll look into it.</strong>
             </p>
             <div className="mt-10 flex flex-col flex-wrap gap-4 sm:flex-row sm:gap-5 md:mt-12">
-              <button onClick={() => setPage("about")} className="w-full bg-[#F2C94C] px-8 py-4 text-sm font-black uppercase tracking-[0.22em] text-[#08111C] transition-colors hover:bg-[#ffe082] sm:w-auto md:tracking-[0.25em]">Submit A Mystery</button>
+              <button onClick={() => setPage("contact")} className="w-full bg-[#F2C94C] px-8 py-4 text-sm font-black uppercase tracking-[0.22em] text-[#08111C] transition-colors hover:bg-[#ffe082] sm:w-auto md:tracking-[0.25em]">Submit A Mystery</button>
               <button onClick={() => setPage("about")} className="w-full border border-[#F2C94C]/40 px-8 py-4 text-sm uppercase tracking-[0.22em] text-[#F2C94C] transition-colors hover:bg-[#F2C94C]/10 sm:w-auto md:tracking-[0.25em]">Learn More</button>
             </div>
           </div>
