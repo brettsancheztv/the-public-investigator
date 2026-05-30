@@ -254,7 +254,7 @@ function Nav({ page, setPage, user, setPageCase }) {
           </button>
         ))}
         <button onClick={() => setPage("account")} className="shrink-0 text-[#F2C94C]">
-          {user ? user.username : "Account"}
+          {user ? user.username : "Create Account"}
         </button>
       </div>
     </nav>
