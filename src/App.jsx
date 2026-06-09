@@ -197,7 +197,7 @@ function SocialStrip() {
   )
 }
 
-function Nav({ page, setPage, user, setPageCase }) {
+function Nav({ page, setPage, user, setPageCase, navigate }) {
   const links = [
     ["home", "Home"],
     ["case-files", "Case Files"],
@@ -234,10 +234,10 @@ function Nav({ page, setPage, user, setPageCase }) {
         </div>
 
         <button
-          onClick={() => setPage("account")}
+          onClick={() => navigate("account", "signup")}
           className="hidden border border-[#F2C94C]/40 px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-[#F2C94C] transition-colors hover:bg-[#F2C94C]/10 md:block"
         >
-          {user ? user.username : "Create Account"}
+          {user ? user.username : "Create Account / Log In"}
         </button>
       </div>
 
@@ -254,8 +254,8 @@ function Nav({ page, setPage, user, setPageCase }) {
             {label}
           </button>
         ))}
-        <button onClick={() => setPage("account")} className="shrink-0 text-[#F2C94C]">
-          {user ? user.username : "Create Account"}
+        <button onClick={() => navigate("account", "signup")} className="shrink-0 text-[#F2C94C]">
+          {user ? user.username : "Create Account / Log In"}
         </button>
       </div>
     </nav>
@@ -442,7 +442,7 @@ function CaseFilesPage({ setPageCase }) {
   )
 }
 
-function CaseDetailPage({ caseId, comments, setComments, user, setPage }) {
+function CaseDetailPage({ caseId, comments, setComments, user, navigate }) {
   const caseFile = caseFiles.find((item) => item.id === caseId) || caseFiles[0]
   const caseComments = comments[caseFile.id] || []
   const [body, setBody] = useState("")
@@ -463,9 +463,9 @@ function CaseDetailPage({ caseId, comments, setComments, user, setPage }) {
             <div className="border border-[#F2C94C]/20 bg-[#0d1725] p-7 md:p-10"><div className="mb-4 text-xs uppercase tracking-[0.3em] text-[#F2C94C]">Case Summary</div><p className="text-lg leading-relaxed text-zinc-300">This is where the full written case file will live: timeline, witnesses, evidence, updates, and final status.</p></div>
           </div>
           <div className="border border-[#F2C94C]/20 bg-[#0d1725] p-6 md:p-8">
-            <div className="mb-6 flex items-center justify-between gap-4"><div><div className="text-xs uppercase tracking-[0.3em] text-[#F2C94C]">Case Discussion</div><h2 className="mt-2 text-3xl font-black uppercase">Public Theories</h2></div><button onClick={() => setPage("discussion")} className="text-xs uppercase tracking-[0.18em] text-zinc-500 hover:text-[#F2C94C]">All Threads</button></div>
+            <div className="mb-6 flex items-center justify-between gap-4"><div><div className="text-xs uppercase tracking-[0.3em] text-[#F2C94C]">Case Discussion</div><h2 className="mt-2 text-3xl font-black uppercase">Public Theories</h2></div><button onClick={() => navigate("discussion")} className="text-xs uppercase tracking-[0.18em] text-zinc-500 hover:text-[#F2C94C]">All Threads</button></div>
             <div className="space-y-4">{caseComments.map((comment, index) => (<div key={index} className="border border-[#F2C94C]/10 bg-[#08111C] p-5"><div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.18em]"><span className="text-[#F2C94C]">@{comment.user}</span><span className="text-zinc-500">{comment.tag}</span></div><p className="leading-relaxed text-zinc-300">{comment.body}</p></div>))}</div>
-            <div className="mt-6 border-t border-[#F2C94C]/10 pt-6">{user ? (<><textarea value={body} onChange={(event) => setBody(event.target.value)} rows={4} placeholder="Add a theory, clue, or comment..." className="w-full resize-none border border-[#F2C94C]/20 bg-[#08111C] p-4 text-sm outline-none focus:border-[#F2C94C]" /><button onClick={addComment} className="mt-4 w-full bg-[#F2C94C] px-6 py-4 text-sm font-black uppercase tracking-[0.25em] text-[#08111C]">Post Comment</button></>) : (<button onClick={() => setPage("account")} className="w-full border border-[#F2C94C]/40 px-6 py-4 text-sm font-black uppercase tracking-[0.25em] text-[#F2C94C] hover:bg-[#F2C94C]/10">Create Account To Comment</button>)}</div>
+            <div className="mt-6 border-t border-[#F2C94C]/10 pt-6">{user ? (<><textarea value={body} onChange={(event) => setBody(event.target.value)} rows={4} placeholder="Add a theory, clue, or comment..." className="w-full resize-none border border-[#F2C94C]/20 bg-[#08111C] p-4 text-sm outline-none focus:border-[#F2C94C]" /><button onClick={addComment} className="mt-4 w-full bg-[#F2C94C] px-6 py-4 text-sm font-black uppercase tracking-[0.25em] text-[#08111C]">Post Comment</button></>) : (<button onClick={() => navigate("account", "signup")} className="w-full border border-[#F2C94C]/40 px-6 py-4 text-sm font-black uppercase tracking-[0.25em] text-[#F2C94C] hover:bg-[#F2C94C]/10">Create Account To Comment</button>)}</div>
           </div>
         </div>
       </section>
@@ -494,8 +494,8 @@ function DiscussionPage({ setPageCase }) {
   )
 }
 
-function AccountPage({ user }) {
-  const [mode, setMode] = useState("login")
+function AccountPage({ user, initialMode }) {
+  const [mode, setMode] = useState(initialMode || "login")
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -611,6 +611,13 @@ export default function PublicInvestigatorFullSite() {
   const [activeCaseId, setActiveCaseId] = useState(null)
   const [user, setUser] = useState(null)
   const [comments, setComments] = useState(starterComments)
+  const [accountMode, setAccountMode] = useState("login")
+
+  function navigate(targetPage, mode) {
+    setActiveCaseId(null)
+    if (mode) setAccountMode(mode)
+    setPage(targetPage)
+  }
 
   useEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: "smooth" }) }, [page, activeCaseId])
 
@@ -635,19 +642,19 @@ export default function PublicInvestigatorFullSite() {
   }, [])
 
   const content = useMemo(() => {
-    if (activeCaseId) return <CaseDetailPage caseId={activeCaseId} comments={comments} setComments={setComments} user={user} setPage={setPage} />
+    if (activeCaseId) return <CaseDetailPage caseId={activeCaseId} comments={comments} setComments={setComments} user={user} navigate={navigate} />
     if (page === "case-files") return <CaseFilesPage setPageCase={setActiveCaseId} />
     if (page === "discussion") return <DiscussionPage setPageCase={setActiveCaseId} />
     if (page === "about") return <AboutPage />
     if (page === "contact") return <ContactPage />
-    if (page === "account") return <AccountPage user={user} />
+    if (page === "account") return <AccountPage user={user} initialMode={accountMode} />
     return <HomePage setPage={setPage} />
-  }, [page, activeCaseId, comments, user])
+  }, [page, activeCaseId, comments, user, accountMode])
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#08111C] font-sans text-[#F5F5F5]">
       <div className="pointer-events-none fixed inset-0 opacity-[0.03] bg-[radial-gradient(circle_at_center,_white_1px,_transparent_1px)] bg-[size:18px_18px]" />
-      <Nav page={page} setPage={setPage} user={user} setPageCase={setActiveCaseId} />
+      <Nav page={page} setPage={setPage} user={user} setPageCase={setActiveCaseId} navigate={navigate} />
       {content}
       <SocialStrip />
     </div>
