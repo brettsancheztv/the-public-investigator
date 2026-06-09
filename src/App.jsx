@@ -494,14 +494,88 @@ function DiscussionPage({ setPageCase }) {
   )
 }
 
-function AccountPage({ user, setUser }) {
-  const [username, setUsername] = useState(user?.username || "")
-  const [email, setEmail] = useState(user?.email || "")
+function AccountPage({ user }) {
+  const [mode, setMode] = useState("login")
+  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState(null)
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+  }
+
+  async function handleSubmit() {
+    setMessage(null)
+    if (mode === "signup") {
+      if (!username.trim() || !email.trim() || !password) {
+        setMessage({ type: "error", text: "Please fill in a username, email, and password." })
+        return
+      }
+      setBusy(true)
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { data: { username: username.trim() } },
+      })
+      setBusy(false)
+      if (error) {
+        setMessage({ type: "error", text: error.message })
+      } else {
+        setMessage({ type: "success", text: "Account created. Check your email for a confirmation link, then log in." })
+        setMode("login")
+        setPassword("")
+      }
+    } else {
+      if (!email.trim() || !password) {
+        setMessage({ type: "error", text: "Please enter your email and password." })
+        return
+      }
+      setBusy(true)
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+      setBusy(false)
+      if (error) setMessage({ type: "error", text: error.message })
+    }
+  }
+
+  if (user) {
+    return (
+      <>
+        <PageHeader eyebrow="Account Access" title="Your Investigator Profile.">You are logged in. You can now post in the case discussion boards.</PageHeader>
+        <section className="py-20 md:py-28"><div className="mx-auto max-w-2xl px-5 md:px-6"><div className="border border-[#F2C94C]/20 bg-[#0d1725] p-7 md:p-10">
+          <div className="mb-6 text-xs uppercase tracking-[0.3em] text-[#F2C94C]">Signed In</div>
+          <div className="space-y-3 text-sm uppercase tracking-[0.12em]">
+            <div><span className="text-zinc-500">Handle: </span><span className="font-black text-zinc-100">{user.username}</span></div>
+            <div><span className="text-zinc-500">Email: </span><span className="text-zinc-100">{user.email}</span></div>
+            <div><span className="text-zinc-500">Role: </span><span className="text-[#F2C94C]">{user.role}</span></div>
+          </div>
+          <button onClick={handleLogout} className="mt-8 w-full border border-[#F2C94C]/40 px-8 py-4 text-sm font-black uppercase tracking-[0.25em] text-[#F2C94C] transition-colors hover:bg-[#F2C94C]/10">Log Out</button>
+        </div></div></section>
+      </>
+    )
+  }
 
   return (
     <>
-      <PageHeader eyebrow="Account Access" title="Create Your Investigator Handle.">Pick a username that can be referenced in future videos, case updates, and public clue callouts.</PageHeader>
-      <section className="py-20 md:py-28"><div className="mx-auto max-w-2xl px-5 md:px-6"><div className="border border-[#F2C94C]/20 bg-[#0d1725] p-7 md:p-10"><div className="mb-4 text-xs uppercase tracking-[0.3em] text-[#F2C94C]">Prototype Account Flow</div><div className="space-y-4"><input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username" className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" /><input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" /><button onClick={() => username && setUser({ username, email })} className="w-full bg-[#F2C94C] px-8 py-5 text-sm font-black uppercase tracking-[0.25em] text-[#08111C]">{user ? "Update Account" : "Create Account"}</button></div><p className="mt-6 text-sm leading-relaxed text-zinc-500">This is a front-end prototype. In production, this connects to Supabase Auth, stores usernames, and protects discussion posting.</p></div></div></section>
+      <PageHeader eyebrow="Account Access" title={mode === "signup" ? "Create Your Investigator Handle." : "Log In To Investigate."}>{mode === "signup" ? "Pick a username that can be referenced in future videos, case updates, and public clue callouts." : "Welcome back. Log in to post theories and join the discussion."}</PageHeader>
+      <section className="py-20 md:py-28"><div className="mx-auto max-w-2xl px-5 md:px-6"><div className="border border-[#F2C94C]/20 bg-[#0d1725] p-7 md:p-10">
+        <div className="mb-6 flex gap-2">
+          <button onClick={() => { setMode("login"); setMessage(null) }} className={`flex-1 px-4 py-3 text-xs font-black uppercase tracking-[0.2em] transition-colors ${mode === "login" ? "bg-[#F2C94C] text-[#08111C]" : "border border-[#F2C94C]/30 text-[#F2C94C]"}`}>Log In</button>
+          <button onClick={() => { setMode("signup"); setMessage(null) }} className={`flex-1 px-4 py-3 text-xs font-black uppercase tracking-[0.2em] transition-colors ${mode === "signup" ? "bg-[#F2C94C] text-[#08111C]" : "border border-[#F2C94C]/30 text-[#F2C94C]"}`}>Sign Up</button>
+        </div>
+        <div className="space-y-4">
+          {mode === "signup" && (
+            <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
+          )}
+          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
+          <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password" className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
+          <button onClick={handleSubmit} disabled={busy} className="w-full bg-[#F2C94C] px-8 py-5 text-sm font-black uppercase tracking-[0.25em] text-[#08111C] transition-colors hover:bg-[#ffe082] disabled:opacity-60">{busy ? "Working..." : mode === "signup" ? "Create Account" : "Log In"}</button>
+        </div>
+        {message && (
+          <p className={`mt-5 text-sm tracking-[0.04em] ${message.type === "error" ? "text-red-400" : "text-green-400"}`}>{message.text}</p>
+        )}
+      </div></div></section>
     </>
   )
 }
@@ -540,13 +614,33 @@ export default function PublicInvestigatorFullSite() {
 
   useEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: "smooth" }) }, [page, activeCaseId])
 
+  useEffect(() => {
+    async function loadUser(authUser) {
+      if (!authUser) { setUser(null); return }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username, role")
+        .eq("id", authUser.id)
+        .maybeSingle()
+      setUser({
+        id: authUser.id,
+        email: authUser.email,
+        username: profile?.username || authUser.email,
+        role: profile?.role || "member",
+      })
+    }
+    supabase.auth.getSession().then(({ data: { session } }) => loadUser(session?.user ?? null))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => loadUser(session?.user ?? null))
+    return () => subscription.unsubscribe()
+  }, [])
+
   const content = useMemo(() => {
     if (activeCaseId) return <CaseDetailPage caseId={activeCaseId} comments={comments} setComments={setComments} user={user} setPage={setPage} />
     if (page === "case-files") return <CaseFilesPage setPageCase={setActiveCaseId} />
     if (page === "discussion") return <DiscussionPage setPageCase={setActiveCaseId} />
     if (page === "about") return <AboutPage />
     if (page === "contact") return <ContactPage />
-    if (page === "account") return <AccountPage user={user} setUser={setUser} />
+    if (page === "account") return <AccountPage user={user} />
     return <HomePage setPage={setPage} />
   }, [page, activeCaseId, comments, user])
 
