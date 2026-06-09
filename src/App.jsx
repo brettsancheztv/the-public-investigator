@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { supabase } from "./supabaseClient"
 
 const processSteps = [
   {
@@ -277,6 +278,36 @@ function PageHeader({ eyebrow, title, children }) {
 }
 
 function SubmissionForm() {
+  const [name, setName] = useState("")
+  const [phone, setPhone] = useState("")
+  const [email, setEmail] = useState("")
+  const [description, setDescription] = useState("")
+  const [status, setStatus] = useState("idle")
+
+  async function handleSubmit() {
+    if (!description.trim()) {
+      setStatus("needs-description")
+      return
+    }
+    setStatus("sending")
+    const { error } = await supabase.from("mysteries").insert({
+      name: name.trim() || null,
+      phone: phone.trim() || null,
+      email: email.trim() || null,
+      description: description.trim(),
+    })
+    if (error) {
+      console.error(error)
+      setStatus("error")
+    } else {
+      setStatus("success")
+      setName("")
+      setPhone("")
+      setEmail("")
+      setDescription("")
+    }
+  }
+
   return (
     <div className="relative">
       <div className="absolute right-4 -top-4 z-20 rotate-[3deg] bg-[#F2C94C] px-5 py-2 text-xs font-black uppercase tracking-[0.25em] text-[#08111C] shadow-xl md:-right-5 md:-top-5 md:rotate-[4deg]">
@@ -289,12 +320,15 @@ function SubmissionForm() {
           <div className="mb-4 text-xs uppercase tracking-[0.3em] text-[#F2C94C]">Open Investigation Request</div>
           <h2 className="mb-8 text-3xl font-black uppercase leading-none md:text-4xl">Tell Us What Happened.</h2>
           <div className="grid gap-4 text-left md:grid-cols-2">
-            <input placeholder="Your Name" className="border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
-            <input placeholder="Phone Number" className="border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
-            <input placeholder="Email" className="border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C] md:col-span-2" />
-            <textarea rows={6} placeholder="Explain the situation..." className="resize-none border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm tracking-[0.05em] outline-none focus:border-[#F2C94C] md:col-span-2" />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your Name" className="border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone Number" className="border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C] md:col-span-2" />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={6} placeholder="Explain the situation..." className="resize-none border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm tracking-[0.05em] outline-none focus:border-[#F2C94C] md:col-span-2" />
           </div>
-          <button className="mt-6 w-full bg-[#F2C94C] px-8 py-5 text-sm font-black uppercase tracking-[0.3em] text-[#08111C] transition-colors hover:bg-[#ffe082]">Open Investigation</button>
+          <button onClick={handleSubmit} disabled={status === "sending"} className="mt-6 w-full bg-[#F2C94C] px-8 py-5 text-sm font-black uppercase tracking-[0.3em] text-[#08111C] transition-colors hover:bg-[#ffe082] disabled:opacity-60">{status === "sending" ? "Sending..." : "Open Investigation"}</button>
+          {status === "success" && <p className="mt-4 text-sm uppercase tracking-[0.15em] text-green-400">Case received — thank you. We'll review it.</p>}
+          {status === "error" && <p className="mt-4 text-sm uppercase tracking-[0.15em] text-red-400">Something went wrong. Please try again in a moment.</p>}
+          {status === "needs-description" && <p className="mt-4 text-sm uppercase tracking-[0.15em] text-red-400">Please describe what happened before submitting.</p>}
         </div>
       </div>
     </div>
