@@ -725,7 +725,10 @@ export default function PublicInvestigatorFullSite() {
   const [comments, setComments] = useState(starterComments)
   const [accountMode, setAccountMode] = useState("login")
 
+  const userNavigatedRef = useRef(false)
+
   function navigate(targetPage, mode) {
+    userNavigatedRef.current = true
     setActiveCaseId(null)
     if (mode) setAccountMode(mode)
     setPage(targetPage)
@@ -750,7 +753,7 @@ export default function PublicInvestigatorFullSite() {
     }
     supabase.auth.getSession().then(({ data: { session } }) => loadUser(session?.user ?? null))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY") {
+      if (event === "PASSWORD_RECOVERY" && !userNavigatedRef.current) {
         setActiveCaseId(null)
         setPage("reset-password")
       }
