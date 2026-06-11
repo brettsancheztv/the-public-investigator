@@ -5,6 +5,14 @@ const isRecoveryLink =
   typeof window !== "undefined" &&
   (window.location.hash.includes("type=recovery") || window.location.search.includes("type=recovery"))
 
+function readRoute() {
+  const raw = (window.location.hash || "").replace(/^#\/?/, "")
+  if (raw.startsWith("case/")) return { page: "case-files", caseId: decodeURIComponent(raw.slice(5)) }
+  const known = ["case-files", "discussion", "about", "contact", "account", "reset-password"]
+  if (known.includes(raw)) return { page: raw, caseId: null }
+  return { page: "home", caseId: null }
+}
+
 const processSteps = [
   {
     title: "You tell us. We listen.",
@@ -446,15 +454,49 @@ function CaseFilesPage({ setPageCase }) {
   )
 }
 
-function CaseDetailPage({ caseId, comments, setComments, user, navigate }) {
+function CaseDetailPage({ caseId, user, navigate }) {
   const caseFile = caseFiles.find((item) => item.id === caseId) || caseFiles[0]
-  const caseComments = comments[caseFile.id] || []
+  const [caseComments, setCaseComments] = useState([])
+  const [loading, setLoading] = useState(true)
   const [body, setBody] = useState("")
+  const [posting, setPosting] = useState(false)
 
-  function addComment() {
-    if (!user || !body.trim()) return
-    setComments((prev) => ({ ...prev, [caseFile.id]: [...(prev[caseFile.id] || []), { user: user.username, body: body.trim(), tag: "Comment" }] }))
-    setBody("")
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    supabase
+      .from("comments")
+      .select("*")
+      .eq("case_id", caseFile.id)
+      .order("created_at", { ascending: true })
+      .then(({ data, error }) => {
+        if (!active) return
+        if (!error) setCaseComments(data || [])
+        setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [caseFile.id])
+
+  async function addComment() {
+    if (!user || !body.trim() || posting) return
+    setPosting(true)
+    const { data, error } = await supabase
+      .from("comments")
+      .insert({ case_id: caseFile.id, user_id: user.id, username: user.username, body: body.trim() })
+      .select()
+      .single()
+    setPosting(false)
+    if (!error && data) {
+      setCaseComments((prev) => [...prev, data])
+      setBody("")
+    }
+  }
+
+  function formatDate(ts) {
+    if (!ts) return ""
+    return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" })
   }
 
   return (
@@ -468,8 +510,18 @@ function CaseDetailPage({ caseId, comments, setComments, user, navigate }) {
           </div>
           <div className="border border-[#F2C94C]/20 bg-[#0d1725] p-6 md:p-8">
             <div className="mb-6 flex items-center justify-between gap-4"><div><div className="text-xs uppercase tracking-[0.3em] text-[#F2C94C]">Case Discussion</div><h2 className="mt-2 text-3xl font-black uppercase">Public Theories</h2></div><button onClick={() => navigate("discussion")} className="text-xs uppercase tracking-[0.18em] text-zinc-500 hover:text-[#F2C94C]">All Threads</button></div>
-            <div className="space-y-4">{caseComments.map((comment, index) => (<div key={index} className="border border-[#F2C94C]/10 bg-[#08111C] p-5"><div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.18em]"><span className="text-[#F2C94C]">@{comment.user}</span><span className="text-zinc-500">{comment.tag}</span></div><p className="leading-relaxed text-zinc-300">{comment.body}</p></div>))}</div>
-            <div className="mt-6 border-t border-[#F2C94C]/10 pt-6">{user ? (<><textarea value={body} onChange={(event) => setBody(event.target.value)} rows={4} placeholder="Add a theory, clue, or comment..." className="w-full resize-none border border-[#F2C94C]/20 bg-[#08111C] p-4 text-sm outline-none focus:border-[#F2C94C]" /><button onClick={addComment} className="mt-4 w-full bg-[#F2C94C] px-6 py-4 text-sm font-black uppercase tracking-[0.25em] text-[#08111C]">Post Comment</button></>) : (<button onClick={() => navigate("account", "signup")} className="w-full border border-[#F2C94C]/40 px-6 py-4 text-sm font-black uppercase tracking-[0.25em] text-[#F2C94C] hover:bg-[#F2C94C]/10">Create Account To Comment</button>)}</div>
+            <div className="space-y-4">
+              {loading ? (
+                <p className="text-sm uppercase tracking-[0.18em] text-zinc-500">Loading theories...</p>
+              ) : caseComments.length === 0 ? (
+                <p className="text-sm uppercase tracking-[0.18em] text-zinc-500">No theories yet. Be the first.</p>
+              ) : (
+                caseComments.map((comment) => (
+                  <div key={comment.id} className="border border-[#F2C94C]/10 bg-[#08111C] p-5"><div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.18em]"><span className="text-[#F2C94C]">@{comment.username}</span><span className="text-zinc-500">{formatDate(comment.created_at)}</span></div><p className="leading-relaxed text-zinc-300">{comment.body}</p></div>
+                ))
+              )}
+            </div>
+            <div className="mt-6 border-t border-[#F2C94C]/10 pt-6">{user ? (<><textarea value={body} onChange={(event) => setBody(event.target.value)} rows={4} placeholder="Add a theory, clue, or comment..." className="w-full resize-none border border-[#F2C94C]/20 bg-[#08111C] p-4 text-sm outline-none focus:border-[#F2C94C]" /><button onClick={addComment} disabled={posting} className="mt-4 w-full bg-[#F2C94C] px-6 py-4 text-sm font-black uppercase tracking-[0.25em] text-[#08111C] disabled:opacity-60">{posting ? "Posting..." : "Post Comment"}</button></>) : (<button onClick={() => navigate("account", "signup")} className="w-full border border-[#F2C94C]/40 px-6 py-4 text-sm font-black uppercase tracking-[0.25em] text-[#F2C94C] hover:bg-[#F2C94C]/10">Create Account To Comment</button>)}</div>
           </div>
         </div>
       </section>
@@ -719,8 +771,9 @@ function ContactPage() {
 }
 
 export default function PublicInvestigatorFullSite() {
-  const [page, setPage] = useState(isRecoveryLink ? "reset-password" : "home")
-  const [activeCaseId, setActiveCaseId] = useState(null)
+  const initialRoute = isRecoveryLink ? { page: "reset-password", caseId: null } : readRoute()
+  const [page, setPage] = useState(initialRoute.page)
+  const [activeCaseId, setActiveCaseId] = useState(initialRoute.caseId)
   const [user, setUser] = useState(null)
   const [comments, setComments] = useState(starterComments)
   const [accountMode, setAccountMode] = useState("login")
@@ -735,6 +788,29 @@ export default function PublicInvestigatorFullSite() {
   }
 
   useEffect(() => { window.scrollTo({ top: 0, left: 0, behavior: "smooth" }) }, [page, activeCaseId])
+
+  useEffect(() => {
+    let hash = ""
+    if (activeCaseId) hash = "#/case/" + encodeURIComponent(activeCaseId)
+    else if (page && page !== "home") hash = "#/" + page
+    if (window.location.hash !== hash) {
+      if (hash === "") {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search)
+      } else {
+        window.location.hash = hash
+      }
+    }
+  }, [page, activeCaseId])
+
+  useEffect(() => {
+    function onHashChange() {
+      const r = readRoute()
+      setActiveCaseId(r.caseId)
+      setPage(r.page)
+    }
+    window.addEventListener("hashchange", onHashChange)
+    return () => window.removeEventListener("hashchange", onHashChange)
+  }, [])
 
   useEffect(() => {
     async function loadUser(authUser) {
