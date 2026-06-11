@@ -1,5 +1,9 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef } from "react"
 import { supabase } from "./supabaseClient"
+
+const isRecoveryLink =
+  typeof window !== "undefined" &&
+  (window.location.hash.includes("type=recovery") || window.location.search.includes("type=recovery"))
 
 const processSteps = [
   {
@@ -501,6 +505,50 @@ function AccountPage({ user, initialMode }) {
   const [password, setPassword] = useState("")
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState(null)
+  const [captchaToken, setCaptchaToken] = useState("")
+  const captchaRef = useRef(null)
+  const widgetIdRef = useRef(null)
+
+  useEffect(() => {
+    const SITEKEY = "0x4AAAAAADhka0sijzcck1QK"
+    function renderWidget() {
+      if (!window.turnstile || !captchaRef.current || widgetIdRef.current !== null) return
+      widgetIdRef.current = window.turnstile.render(captchaRef.current, {
+        sitekey: SITEKEY,
+        theme: "dark",
+        callback: (token) => setCaptchaToken(token),
+        "error-callback": () => setCaptchaToken(""),
+        "expired-callback": () => setCaptchaToken(""),
+      })
+    }
+    if (window.turnstile) {
+      renderWidget()
+    } else {
+      let sc = document.getElementById("cf-turnstile-script")
+      if (!sc) {
+        sc = document.createElement("script")
+        sc.id = "cf-turnstile-script"
+        sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+        sc.async = true
+        sc.defer = true
+        document.head.appendChild(sc)
+      }
+      sc.addEventListener("load", renderWidget)
+    }
+    return () => {
+      if (window.turnstile && widgetIdRef.current !== null) {
+        try { window.turnstile.remove(widgetIdRef.current) } catch (e) {}
+      }
+      widgetIdRef.current = null
+    }
+  }, [user])
+
+  function resetCaptcha() {
+    setCaptchaToken("")
+    if (window.turnstile && widgetIdRef.current !== null) {
+      try { window.turnstile.reset(widgetIdRef.current) } catch (e) {}
+    }
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -508,6 +556,10 @@ function AccountPage({ user, initialMode }) {
 
   async function handleSubmit() {
     setMessage(null)
+    if (!captchaToken) {
+      setMessage({ type: "error", text: "Hang on a second for the security check to finish, then try again." })
+      return
+    }
     if (mode === "signup") {
       if (!username.trim() || !email.trim() || !password) {
         setMessage({ type: "error", text: "Please fill in a username, email, and password." })
@@ -517,7 +569,7 @@ function AccountPage({ user, initialMode }) {
       const { error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: { data: { username: username.trim() } },
+        options: { data: { username: username.trim() }, captchaToken },
       })
       setBusy(false)
       if (error) {
@@ -527,16 +579,27 @@ function AccountPage({ user, initialMode }) {
         setMode("login")
         setPassword("")
       }
+    } else if (mode === "forgot") {
+      if (!email.trim()) {
+        setMessage({ type: "error", text: "Please enter your email." })
+        return
+      }
+      setBusy(true)
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { captchaToken, redirectTo: window.location.origin + "/?type=recovery" })
+      setBusy(false)
+      if (error) setMessage({ type: "error", text: error.message })
+      else setMessage({ type: "success", text: "If that email has an account, a reset link is on its way. Check your inbox (and spam)." })
     } else {
       if (!email.trim() || !password) {
         setMessage({ type: "error", text: "Please enter your email and password." })
         return
       }
       setBusy(true)
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password, options: { captchaToken } })
       setBusy(false)
       if (error) setMessage({ type: "error", text: error.message })
     }
+    resetCaptcha()
   }
 
   if (user) {
@@ -558,7 +621,7 @@ function AccountPage({ user, initialMode }) {
 
   return (
     <>
-      <PageHeader eyebrow="Account Access" title={mode === "signup" ? "Create Your Investigator Handle." : "Log In To Investigate."}>{mode === "signup" ? "Pick a username that can be referenced in future videos, case updates, and public clue callouts." : "Welcome back. Log in to post theories and join the discussion."}</PageHeader>
+      <PageHeader eyebrow="Account Access" title={mode === "signup" ? "Create Your Investigator Handle." : mode === "forgot" ? "Reset Your Password." : "Log In To Investigate."}>{mode === "signup" ? "Pick a username that can be referenced in future videos, case updates, and public clue callouts." : mode === "forgot" ? "Enter your email and we will send you a link to set a new password." : "Welcome back. Log in to post theories and join the discussion."}</PageHeader>
       <section className="py-20 md:py-28"><div className="mx-auto max-w-2xl px-5 md:px-6"><div className="border border-[#F2C94C]/20 bg-[#0d1725] p-7 md:p-10">
         <div className="mb-6 flex gap-2">
           <button onClick={() => { setMode("login"); setMessage(null) }} className={`flex-1 px-4 py-3 text-xs font-black uppercase tracking-[0.2em] transition-colors ${mode === "login" ? "bg-[#F2C94C] text-[#08111C]" : "border border-[#F2C94C]/30 text-[#F2C94C]"}`}>Log In</button>
@@ -566,11 +629,60 @@ function AccountPage({ user, initialMode }) {
         </div>
         <div className="space-y-4">
           {mode === "signup" && (
-            <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username" className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
+            <input value={username} onChange={(e) => setUsername(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSubmit() }} placeholder="Username" className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
           )}
-          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
-          <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password" className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
-          <button onClick={handleSubmit} disabled={busy} className="w-full bg-[#F2C94C] px-8 py-5 text-sm font-black uppercase tracking-[0.25em] text-[#08111C] transition-colors hover:bg-[#ffe082] disabled:opacity-60">{busy ? "Working..." : mode === "signup" ? "Create Account" : "Log In"}</button>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSubmit() }} type="email" placeholder="Email" className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
+          {mode !== "forgot" && (
+            <input value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSubmit() }} type="password" placeholder="Password" className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
+          )}
+          <div ref={captchaRef} className="flex justify-center"></div>
+          <button onClick={handleSubmit} disabled={busy} className="w-full bg-[#F2C94C] px-8 py-5 text-sm font-black uppercase tracking-[0.25em] text-[#08111C] transition-colors hover:bg-[#ffe082] disabled:opacity-60">{busy ? "Working..." : mode === "signup" ? "Create Account" : mode === "forgot" ? "Send Reset Link" : "Log In"}</button>
+          {mode === "login" && (
+            <button onClick={() => { setMode("forgot"); setMessage(null) }} className="w-full text-center text-xs uppercase tracking-[0.18em] text-zinc-500 transition-colors hover:text-[#F2C94C]">Forgot Password?</button>
+          )}
+        </div>
+        {message && (
+          <p className={`mt-5 text-sm tracking-[0.04em] ${message.type === "error" ? "text-red-400" : "text-green-400"}`}>{message.text}</p>
+        )}
+      </div></div></section>
+    </>
+  )
+}
+
+function ResetPasswordPage({ navigate }) {
+  const [password, setPassword] = useState("")
+  const [confirm, setConfirm] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState(null)
+
+  async function handleUpdate() {
+    setMessage(null)
+    if (password.length < 6) {
+      setMessage({ type: "error", text: "Password must be at least 6 characters." })
+      return
+    }
+    if (password !== confirm) {
+      setMessage({ type: "error", text: "Those passwords do not match." })
+      return
+    }
+    setBusy(true)
+    const { error } = await supabase.auth.updateUser({ password })
+    setBusy(false)
+    if (error) setMessage({ type: "error", text: error.message })
+    else {
+      setMessage({ type: "success", text: "Password updated. You are logged in." })
+      navigate("account")
+    }
+  }
+
+  return (
+    <>
+      <PageHeader eyebrow="Account Access" title="Set A New Password.">Choose a new password for your account below.</PageHeader>
+      <section className="py-20 md:py-28"><div className="mx-auto max-w-2xl px-5 md:px-6"><div className="border border-[#F2C94C]/20 bg-[#0d1725] p-7 md:p-10">
+        <div className="space-y-4">
+          <input value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleUpdate() }} type="password" placeholder="New Password" className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
+          <input value={confirm} onChange={(e) => setConfirm(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleUpdate() }} type="password" placeholder="Confirm New Password" className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] outline-none focus:border-[#F2C94C]" />
+          <button onClick={handleUpdate} disabled={busy} className="w-full bg-[#F2C94C] px-8 py-5 text-sm font-black uppercase tracking-[0.25em] text-[#08111C] transition-colors hover:bg-[#ffe082] disabled:opacity-60">{busy ? "Working..." : "Update Password"}</button>
         </div>
         {message && (
           <p className={`mt-5 text-sm tracking-[0.04em] ${message.type === "error" ? "text-red-400" : "text-green-400"}`}>{message.text}</p>
@@ -607,7 +719,7 @@ function ContactPage() {
 }
 
 export default function PublicInvestigatorFullSite() {
-  const [page, setPage] = useState("home")
+  const [page, setPage] = useState(isRecoveryLink ? "reset-password" : "home")
   const [activeCaseId, setActiveCaseId] = useState(null)
   const [user, setUser] = useState(null)
   const [comments, setComments] = useState(starterComments)
@@ -637,7 +749,13 @@ export default function PublicInvestigatorFullSite() {
       })
     }
     supabase.auth.getSession().then(({ data: { session } }) => loadUser(session?.user ?? null))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => loadUser(session?.user ?? null))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setActiveCaseId(null)
+        setPage("reset-password")
+      }
+      loadUser(session?.user ?? null)
+    })
     return () => subscription.unsubscribe()
   }, [])
 
@@ -648,6 +766,7 @@ export default function PublicInvestigatorFullSite() {
     if (page === "about") return <AboutPage />
     if (page === "contact") return <ContactPage />
     if (page === "account") return <AccountPage user={user} initialMode={accountMode} />
+    if (page === "reset-password") return <ResetPasswordPage navigate={navigate} />
     return <HomePage setPage={setPage} />
   }, [page, activeCaseId, comments, user, accountMode])
 
