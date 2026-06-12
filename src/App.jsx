@@ -508,6 +508,13 @@ function CaseDetailPage({ caseId, cases, casesLoading, user, navigate }) {
     return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" })
   }
 
+  async function removeComment(id) {
+    const { error } = await supabase.from("comments").update({ removed: true }).eq("id", id)
+    if (!error) {
+      setCaseComments((prev) => prev.map((c) => (c.id === id ? { ...c, removed: true } : c)))
+    }
+  }
+
   if (!caseFile) {
     return (
       <section className="py-32">
@@ -537,7 +544,7 @@ function CaseDetailPage({ caseId, cases, casesLoading, user, navigate }) {
                 <p className="text-sm uppercase tracking-[0.18em] text-zinc-500">No theories yet. Be the first.</p>
               ) : (
                 caseComments.map((comment) => (
-                  <div key={comment.id} className="border border-[#F2C94C]/10 bg-[#08111C] p-5"><div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.18em]"><span className="text-[#F2C94C]">@{comment.username}</span><span className="text-zinc-500">{formatDate(comment.created_at)}</span></div><p className="leading-relaxed text-zinc-300">{comment.body}</p></div>
+                  <div key={comment.id} className="border border-[#F2C94C]/10 bg-[#08111C] p-5"><div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.18em]"><span className="text-[#F2C94C]">@{comment.username}</span><span className="text-zinc-500">{formatDate(comment.created_at)}</span></div>{comment.removed ? (<p className="text-sm italic leading-relaxed text-zinc-600">[removed by moderator]</p>) : (<><p className="leading-relaxed text-zinc-300">{comment.body}</p>{user?.role === "admin" && (<button onClick={() => removeComment(comment.id)} className="mt-3 text-xs uppercase tracking-[0.18em] text-red-400 transition-colors hover:text-red-300">Remove</button>)}</>)}</div>
                 ))
               )}
             </div>
