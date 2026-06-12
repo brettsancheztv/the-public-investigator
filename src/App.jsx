@@ -468,6 +468,7 @@ function CaseDetailPage({ caseId, cases, casesLoading, user, navigate }) {
   const [loading, setLoading] = useState(true)
   const [body, setBody] = useState("")
   const [posting, setPosting] = useState(false)
+  const [postError, setPostError] = useState("")
 
   useEffect(() => {
     if (!caseFile) return
@@ -490,6 +491,7 @@ function CaseDetailPage({ caseId, cases, casesLoading, user, navigate }) {
 
   async function addComment() {
     if (!user || !caseFile || !body.trim() || posting) return
+    setPostError("")
     setPosting(true)
     const { data, error } = await supabase
       .from("comments")
@@ -500,6 +502,8 @@ function CaseDetailPage({ caseId, cases, casesLoading, user, navigate }) {
     if (!error && data) {
       setCaseComments((prev) => [...prev, data])
       setBody("")
+    } else {
+      setPostError("Your comment could not be posted. Your account may be suspended from posting.")
     }
   }
 
@@ -548,7 +552,7 @@ function CaseDetailPage({ caseId, cases, casesLoading, user, navigate }) {
                 ))
               )}
             </div>
-            <div className="mt-6 border-t border-[#F2C94C]/10 pt-6">{user ? (<><textarea value={body} onChange={(event) => setBody(event.target.value)} rows={4} placeholder="Add a theory, clue, or comment..." className="w-full resize-none border border-[#F2C94C]/20 bg-[#08111C] p-4 text-sm outline-none focus:border-[#F2C94C]" /><button onClick={addComment} disabled={posting} className="mt-4 w-full bg-[#F2C94C] px-6 py-4 text-sm font-black uppercase tracking-[0.25em] text-[#08111C] disabled:opacity-60">{posting ? "Posting..." : "Post Comment"}</button></>) : (<button onClick={() => navigate("account", "signup")} className="w-full border border-[#F2C94C]/40 px-6 py-4 text-sm font-black uppercase tracking-[0.25em] text-[#F2C94C] hover:bg-[#F2C94C]/10">Create Account To Comment</button>)}</div>
+            <div className="mt-6 border-t border-[#F2C94C]/10 pt-6">{user ? (<><textarea value={body} onChange={(event) => setBody(event.target.value)} rows={4} placeholder="Add a theory, clue, or comment..." className="w-full resize-none border border-[#F2C94C]/20 bg-[#08111C] p-4 text-sm outline-none focus:border-[#F2C94C]" /><button onClick={addComment} disabled={posting} className="mt-4 w-full bg-[#F2C94C] px-6 py-4 text-sm font-black uppercase tracking-[0.25em] text-[#08111C] disabled:opacity-60">{posting ? "Posting..." : "Post Comment"}</button>{postError && (<p className="mt-3 text-sm tracking-[0.04em] text-red-400">{postError}</p>)}</>) : (<button onClick={() => navigate("account", "signup")} className="w-full border border-[#F2C94C]/40 px-6 py-4 text-sm font-black uppercase tracking-[0.25em] text-[#F2C94C] hover:bg-[#F2C94C]/10">Create Account To Comment</button>)}</div>
           </div>
         </div>
       </section>
