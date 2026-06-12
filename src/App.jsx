@@ -418,35 +418,43 @@ function HomePage({ setPage }) {
   )
 }
 
-function CaseFilesPage({ setPageCase }) {
+function CaseFilesPage({ setPageCase, cases, casesLoading }) {
   const [searchTerm, setSearchTerm] = useState("")
-  const filteredCases = caseFiles.filter((caseFile) => `${caseFile.date} ${caseFile.title} ${caseFile.summary} ${caseFile.status}`.toLowerCase().includes(searchTerm.toLowerCase().trim()))
+  const filteredCases = cases.filter((caseFile) => `${caseFile.date} ${caseFile.title} ${caseFile.summary} ${caseFile.status}`.toLowerCase().includes(searchTerm.toLowerCase().trim()))
 
   return (
     <>
       <PageHeader eyebrow="Case Archive" title="Case Files">Every mystery gets a file. Every file gets a discussion. Every discussion might reopen the case.</PageHeader>
       <section className="py-20 md:py-28">
         <div className="mx-auto max-w-7xl px-5 md:px-6">
-          <div className="mb-10 border border-[#F2C94C]/20 bg-[#0d1725] p-5 md:p-6">
-            <div className="mb-3 text-xs uppercase tracking-[0.3em] text-[#F2C94C]">Search The Archive</div>
-            <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search by case number, title, status, or keyword..." className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-[#F2C94C]" />
-            <div className="mt-3 text-xs uppercase tracking-[0.18em] text-zinc-500">Showing {filteredCases.length} of {caseFiles.length} case files</div>
-          </div>
-          {filteredCases.length > 0 ? (
-            <div className="grid gap-8 lg:grid-cols-3">
-              {filteredCases.map((caseFile) => (
-                <button key={caseFile.id} onClick={() => setPageCase(caseFile.id)} className="group overflow-hidden border border-[#F2C94C]/20 bg-[#0d1725] text-left transition-all hover:-translate-y-1 hover:border-[#F2C94C]/60">
-                  <div className="flex h-64 items-center justify-center bg-gradient-to-br from-zinc-800 to-black px-8 text-center text-xs uppercase tracking-[0.25em] text-zinc-500">{caseFile.videoLabel}</div>
-                  <div className="p-7">
-                    <div className="mb-4 flex items-center justify-between text-xs uppercase tracking-[0.2em] text-[#F2C94C]"><span>{caseFile.date}</span><span>{caseFile.status}</span></div>
-                    <h2 className="mb-5 text-3xl font-black uppercase leading-none text-zinc-100 group-hover:text-[#F2C94C]">{caseFile.title}</h2>
-                    <p className="leading-relaxed text-zinc-400">{caseFile.summary}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
+          {casesLoading ? (
+            <div className="border border-[#F2C94C]/20 bg-[#0d1725] p-10 text-center"><p className="text-sm uppercase tracking-[0.25em] text-zinc-500">Loading case files...</p></div>
+          ) : cases.length === 0 ? (
+            <div className="border border-[#F2C94C]/20 bg-[#0d1725] p-12 text-center"><div className="mb-4 text-xs uppercase tracking-[0.3em] text-[#F2C94C]">Coming Soon</div><h2 className="mb-4 text-3xl font-black uppercase text-zinc-100">The First Case Is On Its Way.</h2><p className="mx-auto max-w-xl leading-relaxed text-zinc-400">Investigations are being prepared right now. Check back soon, or submit a mystery of your own to help kick things off.</p></div>
           ) : (
-            <div className="border border-[#F2C94C]/20 bg-[#0d1725] p-10 text-center"><div className="mb-3 text-xs uppercase tracking-[0.3em] text-[#F2C94C]">No Case Files Found</div><p className="text-zinc-400">Try searching a different case number, title, status, or keyword.</p></div>
+            <>
+              <div className="mb-10 border border-[#F2C94C]/20 bg-[#0d1725] p-5 md:p-6">
+                <div className="mb-3 text-xs uppercase tracking-[0.3em] text-[#F2C94C]">Search The Archive</div>
+                <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search by case number, title, status, or keyword..." className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.12em] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-[#F2C94C]" />
+                <div className="mt-3 text-xs uppercase tracking-[0.18em] text-zinc-500">Showing {filteredCases.length} of {cases.length} case files</div>
+              </div>
+              {filteredCases.length > 0 ? (
+                <div className="grid gap-8 lg:grid-cols-3">
+                  {filteredCases.map((caseFile) => (
+                    <button key={caseFile.id} onClick={() => setPageCase(caseFile.id)} className="group overflow-hidden border border-[#F2C94C]/20 bg-[#0d1725] text-left transition-all hover:-translate-y-1 hover:border-[#F2C94C]/60">
+                      <div className="flex h-64 items-center justify-center bg-gradient-to-br from-zinc-800 to-black px-8 text-center text-xs uppercase tracking-[0.25em] text-zinc-500">{caseFile.videoLabel}</div>
+                      <div className="p-7">
+                        <div className="mb-4 flex items-center justify-between text-xs uppercase tracking-[0.2em] text-[#F2C94C]"><span>{caseFile.date}</span><span>{caseFile.status}</span></div>
+                        <h2 className="mb-5 text-3xl font-black uppercase leading-none text-zinc-100 group-hover:text-[#F2C94C]">{caseFile.title}</h2>
+                        <p className="leading-relaxed text-zinc-400">{caseFile.summary}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="border border-[#F2C94C]/20 bg-[#0d1725] p-10 text-center"><div className="mb-3 text-xs uppercase tracking-[0.3em] text-[#F2C94C]">No Case Files Found</div><p className="text-zinc-400">Try searching a different case number, title, status, or keyword.</p></div>
+              )}
+            </>
           )}
         </div>
       </section>
@@ -454,14 +462,15 @@ function CaseFilesPage({ setPageCase }) {
   )
 }
 
-function CaseDetailPage({ caseId, user, navigate }) {
-  const caseFile = caseFiles.find((item) => item.id === caseId) || caseFiles[0]
+function CaseDetailPage({ caseId, cases, casesLoading, user, navigate }) {
+  const caseFile = cases.find((item) => item.id === caseId)
   const [caseComments, setCaseComments] = useState([])
   const [loading, setLoading] = useState(true)
   const [body, setBody] = useState("")
   const [posting, setPosting] = useState(false)
 
   useEffect(() => {
+    if (!caseFile) return
     let active = true
     setLoading(true)
     supabase
@@ -477,10 +486,10 @@ function CaseDetailPage({ caseId, user, navigate }) {
     return () => {
       active = false
     }
-  }, [caseFile.id])
+  }, [caseFile?.id])
 
   async function addComment() {
-    if (!user || !body.trim() || posting) return
+    if (!user || !caseFile || !body.trim() || posting) return
     setPosting(true)
     const { data, error } = await supabase
       .from("comments")
@@ -497,6 +506,17 @@ function CaseDetailPage({ caseId, user, navigate }) {
   function formatDate(ts) {
     if (!ts) return ""
     return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  }
+
+  if (!caseFile) {
+    return (
+      <section className="py-32">
+        <div className="mx-auto max-w-2xl px-5 text-center md:px-6">
+          <p className="text-sm uppercase tracking-[0.25em] text-zinc-500">{casesLoading ? "Loading case..." : "That case could not be found."}</p>
+          {!casesLoading && (<button onClick={() => navigate("case-files")} className="mt-6 border border-[#F2C94C]/40 px-6 py-3 text-xs font-black uppercase tracking-[0.25em] text-[#F2C94C] hover:bg-[#F2C94C]/10">Back To Case Files</button>)}
+        </div>
+      </section>
+    )
   }
 
   return (
@@ -529,21 +549,29 @@ function CaseDetailPage({ caseId, user, navigate }) {
   )
 }
 
-function DiscussionPage({ setPageCase }) {
+function DiscussionPage({ setPageCase, cases, casesLoading }) {
   const [searchTerm, setSearchTerm] = useState("")
-  const filteredThreads = caseFiles.filter((caseFile) => `${caseFile.date} ${caseFile.title} ${caseFile.summary} ${caseFile.status}`.toLowerCase().includes(searchTerm.toLowerCase().trim()))
+  const filteredThreads = cases.filter((caseFile) => `${caseFile.date} ${caseFile.title} ${caseFile.summary} ${caseFile.status}`.toLowerCase().includes(searchTerm.toLowerCase().trim()))
 
   return (
     <>
       <PageHeader eyebrow="Public Discussion Board" title="Discuss The Cases.">Each case has its own thread. Theories, clues, disputes, corrections, and suspicious observations belong here.</PageHeader>
       <section className="py-20 md:py-28">
         <div className="mx-auto max-w-7xl px-5 md:px-6">
-          <div className="mb-10 border border-[#F2C94C]/20 bg-[#0d1725] p-5 md:p-6">
-            <div className="mb-3 text-xs uppercase tracking-[0.3em] text-[#F2C94C]">Search Discussions</div>
-            <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search by case number, title, status, or keyword..." className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.08em] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-[#F2C94C] md:tracking-[0.12em]" />
-            <div className="mt-3 text-xs uppercase tracking-[0.18em] text-zinc-500">Showing {filteredThreads.length} of {caseFiles.length} discussion threads</div>
-          </div>
-          {filteredThreads.length > 0 ? (<div className="space-y-5">{filteredThreads.map((caseFile) => (<button key={caseFile.id} onClick={() => setPageCase(caseFile.id)} className="grid w-full gap-6 border border-[#F2C94C]/20 bg-[#0d1725] p-6 text-left transition-all hover:border-[#F2C94C]/60 md:grid-cols-[1fr_auto] md:p-8"><div className="min-w-0"><div className="mb-3 text-xs uppercase tracking-[0.2em] text-[#F2C94C] md:tracking-[0.25em]">{caseFile.date} • {caseFile.status}</div><h2 className="break-words text-3xl font-black uppercase leading-none">{caseFile.title}</h2><p className="mt-4 max-w-3xl leading-relaxed text-zinc-400">{caseFile.summary}</p></div><div className="self-center text-sm uppercase tracking-[0.2em] text-[#F2C94C]">Open Thread</div></button>))}</div>) : (<div className="border border-[#F2C94C]/20 bg-[#0d1725] p-10 text-center"><div className="mb-3 text-xs uppercase tracking-[0.3em] text-[#F2C94C]">No Discussions Found</div><p className="text-zinc-400">Try searching a different case number, title, status, or keyword.</p></div>)}
+          {casesLoading ? (
+            <div className="border border-[#F2C94C]/20 bg-[#0d1725] p-10 text-center"><p className="text-sm uppercase tracking-[0.25em] text-zinc-500">Loading discussions...</p></div>
+          ) : cases.length === 0 ? (
+            <div className="border border-[#F2C94C]/20 bg-[#0d1725] p-12 text-center"><div className="mb-4 text-xs uppercase tracking-[0.3em] text-[#F2C94C]">Coming Soon</div><h2 className="mb-4 text-3xl font-black uppercase text-zinc-100">Discussions Open With The First Case.</h2><p className="mx-auto max-w-xl leading-relaxed text-zinc-400">The boards light up the moment the first investigation drops. Sit tight, or submit a mystery to help start the conversation.</p></div>
+          ) : (
+            <>
+              <div className="mb-10 border border-[#F2C94C]/20 bg-[#0d1725] p-5 md:p-6">
+                <div className="mb-3 text-xs uppercase tracking-[0.3em] text-[#F2C94C]">Search Discussions</div>
+                <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search by case number, title, status, or keyword..." className="w-full border border-[#F2C94C]/20 bg-[#08111C] px-5 py-4 text-sm uppercase tracking-[0.08em] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-[#F2C94C] md:tracking-[0.12em]" />
+                <div className="mt-3 text-xs uppercase tracking-[0.18em] text-zinc-500">Showing {filteredThreads.length} of {cases.length} discussion threads</div>
+              </div>
+              {filteredThreads.length > 0 ? (<div className="space-y-5">{filteredThreads.map((caseFile) => (<button key={caseFile.id} onClick={() => setPageCase(caseFile.id)} className="grid w-full gap-6 border border-[#F2C94C]/20 bg-[#0d1725] p-6 text-left transition-all hover:border-[#F2C94C]/60 md:grid-cols-[1fr_auto] md:p-8"><div className="min-w-0"><div className="mb-3 text-xs uppercase tracking-[0.2em] text-[#F2C94C] md:tracking-[0.25em]">{caseFile.date} • {caseFile.status}</div><h2 className="break-words text-3xl font-black uppercase leading-none">{caseFile.title}</h2><p className="mt-4 max-w-3xl leading-relaxed text-zinc-400">{caseFile.summary}</p></div><div className="self-center text-sm uppercase tracking-[0.2em] text-[#F2C94C]">Open Thread</div></button>))}</div>) : (<div className="border border-[#F2C94C]/20 bg-[#0d1725] p-10 text-center"><div className="mb-3 text-xs uppercase tracking-[0.3em] text-[#F2C94C]">No Discussions Found</div><p className="text-zinc-400">Try searching a different case number, title, status, or keyword.</p></div>)}
+            </>
+          )}
         </div>
       </section>
     </>
@@ -777,6 +805,8 @@ export default function PublicInvestigatorFullSite() {
   const [user, setUser] = useState(null)
   const [comments, setComments] = useState(starterComments)
   const [accountMode, setAccountMode] = useState("login")
+  const [cases, setCases] = useState([])
+  const [casesLoading, setCasesLoading] = useState(true)
 
   const userNavigatedRef = useRef(false)
 
@@ -813,6 +843,19 @@ export default function PublicInvestigatorFullSite() {
   }, [])
 
   useEffect(() => {
+    supabase
+      .from("cases")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .then(({ data, error }) => {
+        if (!error) {
+          setCases((data || []).map((c) => ({ id: c.id, title: c.title, status: c.status, location: c.location, date: c.date, summary: c.summary, videoLabel: c.video_label })))
+        }
+        setCasesLoading(false)
+      })
+  }, [])
+
+  useEffect(() => {
     async function loadUser(authUser) {
       if (!authUser) { setUser(null); return }
       const { data: profile } = await supabase
@@ -839,15 +882,15 @@ export default function PublicInvestigatorFullSite() {
   }, [])
 
   const content = useMemo(() => {
-    if (activeCaseId) return <CaseDetailPage caseId={activeCaseId} comments={comments} setComments={setComments} user={user} navigate={navigate} />
-    if (page === "case-files") return <CaseFilesPage setPageCase={setActiveCaseId} />
-    if (page === "discussion") return <DiscussionPage setPageCase={setActiveCaseId} />
+    if (activeCaseId) return <CaseDetailPage caseId={activeCaseId} cases={cases} casesLoading={casesLoading} user={user} navigate={navigate} />
+    if (page === "case-files") return <CaseFilesPage setPageCase={setActiveCaseId} cases={cases} casesLoading={casesLoading} />
+    if (page === "discussion") return <DiscussionPage setPageCase={setActiveCaseId} cases={cases} casesLoading={casesLoading} />
     if (page === "about") return <AboutPage />
     if (page === "contact") return <ContactPage />
     if (page === "account") return <AccountPage user={user} initialMode={accountMode} />
     if (page === "reset-password") return <ResetPasswordPage navigate={navigate} />
     return <HomePage setPage={setPage} />
-  }, [page, activeCaseId, comments, user, accountMode])
+  }, [page, activeCaseId, comments, user, accountMode, cases, casesLoading])
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#08111C] font-sans text-[#F5F5F5]">
