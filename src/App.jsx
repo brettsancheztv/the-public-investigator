@@ -8,7 +8,7 @@ const isRecoveryLink =
 function readRoute() {
   const raw = (window.location.hash || "").replace(/^#\/?/, "")
   if (raw.startsWith("case/")) return { page: "case-files", caseId: decodeURIComponent(raw.slice(5)) }
-  const known = ["case-files", "discussion", "about", "contact", "account", "reset-password"]
+  const known = ["case-files", "discussion", "about", "contact", "account", "reset-password", "admin"]
   if (known.includes(raw)) return { page: raw, caseId: null }
   return { page: "home", caseId: null }
 }
@@ -217,6 +217,7 @@ function Nav({ page, setPage, user, setPageCase, navigate }) {
     ["about", "About"],
     ["contact", "Contact"],
   ]
+  if (user?.role === "admin") links.push(["admin", "Admin"])
 
   return (
     <nav className="sticky top-0 z-50 border-b border-[#F2C94C]/20 bg-[#08111C]/90 backdrop-blur-sm">
@@ -783,6 +784,130 @@ function ResetPasswordPage({ navigate }) {
   )
 }
 
+function AdminPage({ user, navigate }) {
+  const [tab, setTab] = useState("submissions")
+  const [submissions, setSubmissions] = useState([])
+  const [users, setUsers] = useState([])
+  const [recentComments, setRecentComments] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (user?.role !== "admin") return
+    let active = true
+    async function loadAll() {
+      setLoading(true)
+      const [subs, profs, cmts] = await Promise.all([
+        supabase.from("mysteries").select("*").order("created_at", { ascending: false }),
+        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+        supabase.from("comments").select("*").order("created_at", { ascending: false }).limit(50),
+      ])
+      if (!active) return
+      if (!subs.error) setSubmissions(subs.data || [])
+      if (!profs.error) setUsers(profs.data || [])
+      if (!cmts.error) setRecentComments(cmts.data || [])
+      setLoading(false)
+    }
+    loadAll()
+    return () => { active = false }
+  }, [user?.role])
+
+  async function markReviewed(id) {
+    await supabase.from("mysteries").update({ status: "reviewed" }).eq("id", id)
+    setSubmissions((prev) => prev.map((x) => (x.id === id ? { ...x, status: "reviewed" } : x)))
+  }
+  async function deleteSubmission(id) {
+    await supabase.from("mysteries").delete().eq("id", id)
+    setSubmissions((prev) => prev.filter((x) => x.id !== id))
+  }
+  async function setBannedFlag(id, banned) {
+    await supabase.from("profiles").update({ banned }).eq("id", id)
+    setUsers((prev) => prev.map((x) => (x.id === id ? { ...x, banned } : x)))
+  }
+  async function setRoleFlag(id, role) {
+    await supabase.from("profiles").update({ role }).eq("id", id)
+    setUsers((prev) => prev.map((x) => (x.id === id ? { ...x, role } : x)))
+  }
+  async function removeComment(id) {
+    await supabase.from("comments").update({ removed: true }).eq("id", id)
+    setRecentComments((prev) => prev.map((x) => (x.id === id ? { ...x, removed: true } : x)))
+  }
+  function fmt(ts) {
+    if (!ts) return ""
+    return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  }
+
+  if (user?.role !== "admin") {
+    return (
+      <section className="py-32">
+        <div className="mx-auto max-w-2xl px-5 text-center md:px-6">
+          <p className="text-sm uppercase tracking-[0.25em] text-zinc-500">Admins only.</p>
+          <button onClick={() => navigate("home")} className="mt-6 border border-[#F2C94C]/40 px-6 py-3 text-xs font-black uppercase tracking-[0.25em] text-[#F2C94C] hover:bg-[#F2C94C]/10">Back Home</button>
+        </div>
+      </section>
+    )
+  }
+
+  const tabs = [["submissions", "Submissions"], ["users", "Users"], ["comments", "Comments"]]
+
+  return (
+    <>
+      <PageHeader eyebrow="Control Room" title="Admin Panel">Review mystery submissions, manage members, and moderate the discussion boards.</PageHeader>
+      <section className="py-16 md:py-20">
+        <div className="mx-auto max-w-7xl px-5 md:px-6">
+          <div className="mb-8 flex flex-wrap gap-2">
+            {tabs.map(([key, label]) => (
+              <button key={key} onClick={() => setTab(key)} className={`px-4 py-3 text-xs font-black uppercase tracking-[0.2em] transition-colors ${tab === key ? "bg-[#F2C94C] text-[#08111C]" : "border border-[#F2C94C]/30 text-[#F2C94C]"}`}>{label}</button>
+            ))}
+          </div>
+
+          {loading ? (
+            <p className="text-sm uppercase tracking-[0.18em] text-zinc-500">Loading...</p>
+          ) : tab === "submissions" ? (
+            <div className="space-y-4">
+              {submissions.length === 0 ? (<p className="text-sm uppercase tracking-[0.18em] text-zinc-500">No submissions yet.</p>) : submissions.map((sub) => (
+                <div key={sub.id} className="border border-[#F2C94C]/15 bg-[#0d1725] p-5">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs uppercase tracking-[0.15em]">
+                    <span className="text-[#F2C94C]">{sub.name || "Anonymous"}{sub.status === "reviewed" ? <span className="ml-2 text-zinc-500">(reviewed)</span> : null}</span>
+                    <span className="text-zinc-500">{fmt(sub.created_at)}</span>
+                  </div>
+                  <p className="mb-3 leading-relaxed text-zinc-300">{sub.description}</p>
+                  <div className="mb-4 text-xs uppercase tracking-[0.12em] text-zinc-500">{sub.email || "no email"}{sub.phone ? " • " + sub.phone : ""}</div>
+                  <div className="flex gap-4">
+                    {sub.status !== "reviewed" && <button onClick={() => markReviewed(sub.id)} className="text-xs uppercase tracking-[0.18em] text-[#F2C94C] hover:text-[#ffe082]">Mark Reviewed</button>}
+                    <button onClick={() => deleteSubmission(sub.id)} className="text-xs uppercase tracking-[0.18em] text-red-400 hover:text-red-300">Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : tab === "users" ? (
+            <div className="space-y-3">
+              {users.map((u) => (
+                <div key={u.id} className="flex flex-wrap items-center justify-between gap-3 border border-[#F2C94C]/15 bg-[#0d1725] p-4">
+                  <div className="text-sm uppercase tracking-[0.12em]"><span className="font-black text-zinc-100">@{u.username || "—"}</span><span className="ml-3 text-[#F2C94C]">{u.role}</span>{u.banned ? <span className="ml-3 text-red-400">banned</span> : null}</div>
+                  <div className="flex gap-4">
+                    {u.banned ? (<button onClick={() => setBannedFlag(u.id, false)} className="text-xs uppercase tracking-[0.18em] text-[#F2C94C] hover:text-[#ffe082]">Unban</button>) : (<button onClick={() => setBannedFlag(u.id, true)} className="text-xs uppercase tracking-[0.18em] text-red-400 hover:text-red-300">Ban</button>)}
+                    {u.role === "admin" ? (<button onClick={() => setRoleFlag(u.id, "member")} className="text-xs uppercase tracking-[0.18em] text-zinc-400 hover:text-zinc-200">Remove Admin</button>) : (<button onClick={() => setRoleFlag(u.id, "admin")} className="text-xs uppercase tracking-[0.18em] text-zinc-400 hover:text-zinc-200">Make Admin</button>)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentComments.length === 0 ? (<p className="text-sm uppercase tracking-[0.18em] text-zinc-500">No comments yet.</p>) : recentComments.map((c) => (
+                <div key={c.id} className="border border-[#F2C94C]/15 bg-[#0d1725] p-4">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs uppercase tracking-[0.15em]"><span className="text-[#F2C94C]">@{c.username}<span className="ml-2 text-zinc-600">{c.case_id}</span></span><span className="text-zinc-500">{fmt(c.created_at)}</span></div>
+                  <p className={`leading-relaxed ${c.removed ? "italic text-zinc-600" : "text-zinc-300"}`}>{c.removed ? "[removed by moderator]" : c.body}</p>
+                  {!c.removed && <button onClick={() => removeComment(c.id)} className="mt-2 text-xs uppercase tracking-[0.18em] text-red-400 hover:text-red-300">Remove</button>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+    </>
+  )
+}
+
 function AboutPage() {
   const aboutSteps = [
     { title: "You tell us. We listen.", body: "You submit the strange story, petty dispute, missing item, bizarre rumor, or situation that makes absolutely no sense. We read it, look for the hook, and decide whether it has the right mix of mystery, humor, and public interest." },
@@ -900,6 +1025,7 @@ export default function PublicInvestigatorFullSite() {
     if (page === "contact") return <ContactPage />
     if (page === "account") return <AccountPage user={user} initialMode={accountMode} />
     if (page === "reset-password") return <ResetPasswordPage navigate={navigate} />
+    if (page === "admin") return <AdminPage user={user} navigate={navigate} />
     return <HomePage setPage={setPage} />
   }, [page, activeCaseId, comments, user, accountMode, cases, casesLoading])
 
