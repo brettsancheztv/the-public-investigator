@@ -21,7 +21,9 @@ import re
 import json
 import html
 import time
+import calendar
 import urllib.parse
+from datetime import datetime, timedelta, timezone
 
 import feedparser
 import requests
@@ -93,7 +95,9 @@ KEEP_SIGNALS = [
 USER_AGENT = "ThePublicInvestigator/1.0 (lead scraper; admin@thepublicinvestigator.com)"
 MAX_PER_FEED = 25       # how many to take from each LOCAL subreddit
 NATIONAL_CAP = 3        # how many to take from each NATIONAL weird subreddit
-NEWS_PER_PLACE = 15     # how many news stories to take per Gulf South place
+NEWS_PER_PLACE = 8      # how many news stories to take per Gulf South place
+MAX_AGE_HOURS = 48      # ignore anything older than this many hours
+KEEP_HOURS = 72         # auto-delete unkept leads older than this many hours
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
@@ -131,6 +135,14 @@ def to_iso(entry):
         return None
 
 
+def too_old(entry):
+    t = entry.get("published_parsed") or entry.get("updated_parsed")
+    if not t:
+        return False  # no date -> keep it
+    age_hours = (time.time() - calendar.timegm(t)) / 3600
+    return age_hours > MAX_AGE_HOURS
+
+
 def google_news_url(query):
     q = urllib.parse.quote(query)
     return f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
@@ -145,6 +157,8 @@ def add_lead(bucket, *, source, source_type, entry, require_signal=False):
     url = entry.get("link")
     summary = clean(entry.get("summary"))
     if not title or not url:
+        return
+    if too_old(entry):
         return
     if is_blocked(title + " " + summary):
         return
@@ -225,6 +239,25 @@ def save_to_supabase(rows):
         print("Supabase error:", r.status_code, r.text[:500])
 
 
+def cleanup_old_leads():
+    """Delete leads older than KEEP_HOURS that you never marked 'Keep'."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=KEEP_HOURS)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    endpoint = f"{SUPABASE_URL}/rest/v1/leads?kept=eq.false&created_at=lt.{cutoff}"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Prefer": "return=minimal",
+    }
+    try:
+        r = requests.delete(endpoint, headers=headers, timeout=60)
+        if r.status_code in (200, 204):
+            print(f"Cleaned out unkept leads older than {KEEP_HOURS} hours.")
+        else:
+            print("Cleanup note:", r.status_code, r.text[:200])
+    except Exception as e:
+        print("Cleanup skipped:", e)
+
+
 def preview(rows):
     total = len(rows)
     national = sum(1 for r in rows if r["source_type"] == "national")
@@ -246,6 +279,7 @@ def main():
         return
     if SUPABASE_URL and SUPABASE_KEY:
         save_to_supabase(rows)
+        cleanup_old_leads()
     else:
         preview(rows)
 
