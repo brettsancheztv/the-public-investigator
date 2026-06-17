@@ -785,10 +785,13 @@ function ResetPasswordPage({ navigate }) {
 }
 
 function AdminPage({ user, navigate }) {
-  const [tab, setTab] = useState("submissions")
+  const [tab, setTab] = useState("leads")
   const [submissions, setSubmissions] = useState([])
   const [users, setUsers] = useState([])
   const [recentComments, setRecentComments] = useState([])
+  const [leads, setLeads] = useState([])
+  const [selected, setSelected] = useState([])
+  const [leadFilter, setLeadFilter] = useState("all")
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -796,15 +799,17 @@ function AdminPage({ user, navigate }) {
     let active = true
     async function loadAll() {
       setLoading(true)
-      const [subs, profs, cmts] = await Promise.all([
+      const [subs, profs, cmts, lds] = await Promise.all([
         supabase.from("mysteries").select("*").order("created_at", { ascending: false }),
         supabase.from("profiles").select("*").order("created_at", { ascending: false }),
         supabase.from("comments").select("*").order("created_at", { ascending: false }).limit(50),
+        supabase.from("leads").select("*").order("created_at", { ascending: false }),
       ])
       if (!active) return
       if (!subs.error) setSubmissions(subs.data || [])
       if (!profs.error) setUsers(profs.data || [])
       if (!cmts.error) setRecentComments(cmts.data || [])
+      if (!lds.error) setLeads(lds.data || [])
       setLoading(false)
     }
     loadAll()
@@ -831,6 +836,19 @@ function AdminPage({ user, navigate }) {
     await supabase.from("comments").update({ removed: true }).eq("id", id)
     setRecentComments((prev) => prev.map((x) => (x.id === id ? { ...x, removed: true } : x)))
   }
+  function toggleSelect(id) {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+  async function deleteSelected() {
+    if (selected.length === 0) return
+    await supabase.from("leads").delete().in("id", selected)
+    setLeads((prev) => prev.filter((l) => !selected.includes(l.id)))
+    setSelected([])
+  }
+  async function toggleKeep(id, kept) {
+    await supabase.from("leads").update({ kept }).eq("id", id)
+    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, kept } : l)))
+  }
   function fmt(ts) {
     if (!ts) return ""
     return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -847,7 +865,7 @@ function AdminPage({ user, navigate }) {
     )
   }
 
-  const tabs = [["submissions", "Submissions"], ["users", "Users"], ["comments", "Comments"]]
+  const tabs = [["leads", "Leads"], ["submissions", "Submissions"], ["users", "Users"], ["comments", "Comments"]]
 
   return (
     <>
@@ -862,6 +880,34 @@ function AdminPage({ user, navigate }) {
 
           {loading ? (
             <p className="text-sm uppercase tracking-[0.18em] text-zinc-500">Loading...</p>
+          ) : tab === "leads" ? (
+            <div>
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                {[["all", "All"], ["new", "Unkept"], ["kept", "Kept"]].map(([key, label]) => (
+                  <button key={key} onClick={() => setLeadFilter(key)} className={`px-3 py-2 text-xs font-black uppercase tracking-[0.18em] ${leadFilter === key ? "bg-[#F2C94C] text-[#08111C]" : "border border-[#F2C94C]/30 text-[#F2C94C]"}`}>{label}</button>
+                ))}
+                <button onClick={deleteSelected} disabled={selected.length === 0} className="ml-auto px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-red-400 hover:text-red-300 disabled:opacity-40">Delete Selected ({selected.length})</button>
+              </div>
+              <p className="mb-4 text-xs uppercase tracking-[0.12em] text-zinc-500">Unkept leads auto-delete after 72 hours. Hit Keep on the ones worth saving.</p>
+              <div className="space-y-2">
+                {leads.filter((l) => (leadFilter === "all" ? true : leadFilter === "kept" ? l.kept : !l.kept)).length === 0 ? (
+                  <p className="text-sm uppercase tracking-[0.18em] text-zinc-500">No leads here yet.</p>
+                ) : (
+                  leads
+                    .filter((l) => (leadFilter === "all" ? true : leadFilter === "kept" ? l.kept : !l.kept))
+                    .map((l) => (
+                      <div key={l.id} className={`flex items-start gap-3 border p-3 ${l.kept ? "border-[#F2C94C]/50 bg-[#F2C94C]/5" : "border-[#F2C94C]/15 bg-[#0d1725]"}`}>
+                        <input type="checkbox" checked={selected.includes(l.id)} onChange={() => toggleSelect(l.id)} className="mt-1 h-4 w-4 accent-[#F2C94C]" />
+                        <div className="min-w-0 flex-1">
+                          <a href={l.url} target="_blank" rel="noreferrer" className="block break-words font-bold text-zinc-100 hover:text-[#F2C94C]">{l.title}</a>
+                          <div className="mt-1 text-xs uppercase tracking-[0.12em] text-zinc-500">{l.source} • {fmt(l.created_at)}{l.kept ? <span className="ml-2 text-[#F2C94C]">kept</span> : null}</div>
+                        </div>
+                        <button onClick={() => toggleKeep(l.id, !l.kept)} className={`shrink-0 px-3 py-2 text-xs font-black uppercase tracking-[0.18em] ${l.kept ? "text-zinc-400 hover:text-zinc-200" : "text-[#F2C94C] hover:text-[#ffe082]"}`}>{l.kept ? "Unkeep" : "Keep"}</button>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
           ) : tab === "submissions" ? (
             <div className="space-y-4">
               {submissions.length === 0 ? (<p className="text-sm uppercase tracking-[0.18em] text-zinc-500">No submissions yet.</p>) : submissions.map((sub) => (
